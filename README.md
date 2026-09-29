@@ -1,3 +1,7 @@
+# Real-Time Webcam Eye-Gaze Tracking and Gaze Keyboard
+GazeType is a low-cost, webcam-based eye-gaze communication system for people with severe speech and motor impairments.
+It converts eye movements into text using a virtual keyboard and word prediction, then transforms messages into speech for faster, more independent communication.
+
 # Real-Time Webcam Eye-Gaze Tracking, Dwell Detection & Gaze Keyboard (v7)
 
 ## v7 - stable continuous typing (refinement, nothing rebuilt)
