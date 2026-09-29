@@ -2,135 +2,8 @@
 GazeType is a low-cost, webcam-based eye-gaze communication system for people with severe speech and motor impairments.
 It converts eye movements into text using a virtual keyboard and word prediction, then transforms messages into speech for faster, more independent communication.
 
-# Real-Time Webcam Eye-Gaze Tracking, Dwell Detection & Gaze Keyboard (v7)
-
-## v7 - stable continuous typing (refinement, nothing rebuilt)
-
-- **Fixation-locked stabiliser** (`gaze/stabilizer.py`): stronger One Euro filtering (min_cutoff 0.25,
-  vertical 0.18, beta 0.006). While you look at a key, the position is held on a running median, so
-  micro-jitter cannot move it. A deliberate jump of more than half a key, seen on 2 frames, is treated
-  as a move: history is dropped and the cursor snaps to the new key in about 100 ms. The jump threshold
-  rises automatically when the tracking is noisier.
-- **Movement-aware hysteresis** (`keyboard/selector.py`): while you look at a key it is sticky (leave by
-  15% of its width or 25% of its height). Right after a real eye jump the stickiness is switched off and
-  switching is fast, so a small intentional move to the next key is enough.
-- **Stable-gaze dwell:** dwell counts only during a stable fixation and after a 0.12 s settle. Unstable
-  frames pause it instead of resetting it. Returning within 0.6 s after a quick glance away keeps 80%
-  of the progress.
-- **No accidental repeats:** a key that has just typed is locked. Typing it again needs either a look
-  away and back, or holding for 1.8x the dwell (for double letters like EE / LL, shown with an amber
-  progress bar). Set `key_repeat_factor = 0` to always require looking away.
-- **Vertical accuracy:** calibration now also learns how much this user's eyelids close when looking
-  down (per-user, kept only if it lowers the leave-one-out error).
-- **Bottom row:** `Y Z . ? SPACE BACKSPACE CLEAR ENTER`, 20% taller than the letter rows. ENTER speaks
-  the line, writes it to `data/typed_log.txt` and starts a new line (BACKSPACE undoes).
-
-All settings are in `config/config.py` under "v7".
-
----
-
-## v6 - whole keyboard reachable without extreme eye angles (14" laptop)
-
-**The physics:** at ~50 cm from a 14" screen the whole keyboard spans only ~34 x 20 degrees.
-Each letter key is ~4.4 deg wide and only ~2.6-2.9 deg tall. Webcam iris tracking is
-compressed towards the centre at the edges (iris model, eyelids, head turning), so after
-calibration the cursor stopped short of the outer keys and users had to roll their eyes to
-extreme angles to reach them.
-
-**What changed (letters and layout unchanged):**
-- **Reach tuning** (`gaze/reach.py`, `ui/reach_ui.py`), about 15 s, runs automatically after
-  calibration (or with the "Reach Tuning" button). The user looks at 9 real key centres. Separate
-  left/right/up/down edge gains are fitted, so outer keys are reached at a comfortable angle; the centre
-  is untouched. It reports how far the gaze got before tuning ("right 76%") and a corner check error.
-- **Sticky keys:** once a key is active, gaze must leave it by 20% of its width or 30% of its height
-  before a neighbour takes over. This stops jitter across key borders, especially vertically.
-- Vertical axis gets extra smoothing (`one_euro_min_cutoff_y`).
-- Camera now 1280x720 by default (twice the eye pixels of 640x480).
-- The keyboard never runs uncalibrated: it starts calibration, then reach tuning, then opens.
-- Calibration error is also shown in degrees (`screen_diagonal_in`, `viewing_distance_cm`).
-
-**Setup for a 14" laptop:** sit 45-55 cm away, eyes level with the top third of the screen, face
-evenly lit (no window behind you). Run `python main.py --keyboard`: calibration (24 dots) runs first,
-then reach tuning (9 keys), then typing starts. Redo both if you move the laptop or change seat.
-
----
-
-## v5 - speech fix: everything typed is spoken
-
-**Why v4 was silent:** the voice ran pyttsx3 in a background thread. On macOS that driver needs
-the main thread, and on Windows it needs COM set up in the thread, so it either failed or
-hung. After a hang the keyboard thought it was *still speaking*, so SPEAK acted as STOP and every
-later sentence was dropped. Errors only went to the console.
-
-**Now:**
-- Speech engine per OS: macOS `say`, Windows SAPI voice (PowerShell fallback), Linux espeak-ng.
-  pyttsx3 is last resort only. A watchdog guarantees the voice can never stay stuck.
-- **Speak-as-you-type** (`speech_echo` in config/config.py):
-  `word` (default) = each word is spoken as soon as it is finished (SPACE, suggestion, punctuation),
-  and the whole sentence is spoken at `.` / `?`; `letter` = also every letter; `sentence`; `off`.
-- SPEAK reads everything typed; looking at it while talking = STOP.
-- The text bar shows which voice is active, or the error in red if there is none.
-- **If you hear nothing, run `python tools/test_speech.py` first** - it names the engine and the error.
-
----
-
-## What changed in v4
-
-**Bottom rows / right-hand columns could not be selected - three causes fixed:**
-1. *Blink filter treated looking down as a blink.* Lowered lids (normal when looking at the
-   bottom of the screen) were flagged as a blink indefinitely. Now a blink must be short
-   (<= 0.35 s); a sustained low lid position is accepted as downward gaze (`gaze/blink.py`).
-   Eye openness was also removed from the MediaPipe confidence score for the same reason.
-2. *Head movement stole eye movement.* Users turn/tilt the head towards the edges, so the eyes
-   rotate less than during calibration and the mapping under-reached the borders. Calibration now
-   records head yaw/pitch and adds head-pose terms when they improve the leave-one-out error.
-3. *Edges were extrapolated.* Calibration adds 8 edge targets (corners + mid-edges, 3% margin) to
-   the 16-point grid, fits a cubic model, rejects a calibration with no data on any edge, and never
-   hangs on a target the tracker cannot see (4 s timeout per target).
-   `edge_gain_x/y` in config is a manual last-resort stretch (default 1.0).
-
-**Word suggestions**: a row of 4 predicted words above the phrases. Completes the current word or
-predicts the next one (care vocabulary + ~20k-word English list + words the user types, learned
-into `data/user_vocab.json`). Offline. Offensive words are never suggested.
-
-**Text-to-speech**: SPEAK key (top-right of the suggestion row) reads the typed text; looking at it
-again while talking = STOP. Finished sentences (`.` `?`) are spoken automatically
-(`keyboard_speak_on_sentence_end`). Backends: pyttsx3 -> Windows System.Speech (built in) ->
-macOS `say` -> Linux espeak. The dashboard text box also has a "Speak" button.
-
-```
-+--------------------------------------------------------------+-------+
-|  typed text                                                  | PAUSE |
-+------------+------------+------------+------------+------------------+
-| suggestion | suggestion | suggestion | suggestion |   SPEAK / STOP   |
-+-------+-------+----------+------+------+----------+-----+------------+
-| WATER | FOOD  | WASHROOM | HELP | PAIN | MEDICINE | YES |  NO        |
-+-------+-------+-------+-------+-------+-------+-------+------------+
-|   A   |   B   |   C   |   D   |   E   |   F   |   G   |   H        |
-|   I   |   J   |   K   |   L   |   M   |   N   |   O   |   P        |
-|   Q   |   R   |   S   |   T   |   U   |   V   |   W   |   X        |
-|   Y   |   Z   |   .   |   ?   | SPACE | BACKSPACE | CLEAR | ENTER  |
-+--------------------------------------------------------------------+
-```
-Recalibrate after upgrading: v3 calibration profiles are rejected (different model).
-
----
-
-## What changed in v3
-
-| Area | v1 (original) | v3 (this build) |
-|---|---|---|
-| Gaze backend | dlib 68 landmarks + pupil thresholding | **MediaPipe Face Mesh + Iris** (offline, default). dlib kept as `--backend dlib` |
-| Horizontal precision* | ~76 px jitter | **~48 px** |
-| Vertical precision* | ~404 px jitter (lid-normalised ratio, effectively noise) | **~39 px** (iris offset from eye-corner line fused with lid aperture) |
-| Blink handling | fixed EAR threshold (missed most blinks) | adaptive per user + 3-frame post-blink hold-off |
-| Calibration | 3x3, 12% margins, 15 samples, training error shown | **4x4, 5% margins (edges measured)**, 30 samples, median, leave-one-out error shown, rejects bad fits |
-| Long-session drift | none | **online drift correction** learned from every confirmed key (undone by DEL) |
-| Keyboard | 3x3 demo keypad | **full-screen keyboard: 8 quick phrases + A-Z + controls, tiled edge-to-edge** |
-
-*Per-frame jitter measured on the candidate video, assuming the recorded eye movements span 90% of a
-1920x1080 screen. This is precision (steadiness), not accuracy (bias): accuracy must be measured with
-`tools/record_session.py` + `tools/replay_video.py` on your real webcam.
+# Real-Time Webcam Eye-Gaze Tracking, Dwell Detection & Gaze Keyboard Demo
+https://github.com/user-attachments/assets/cc3c787e-92a9-42b2-85d6-44e7e979eed9
 
 ### Gaze keyboard
 ```
@@ -149,15 +22,7 @@ python main.py --keyboard          # opens dashboard + full-screen keyboard
 2. `python main.py --keyboard`.
 3. Recalibrate whenever the user or the laptop/camera position changes noticeably.
 
-### Measuring accuracy (do this before claiming a number)
-```
-python tools/record_session.py --out data/recordings/p01 --grid 4x4 --hold 2 --shuffle
-python tools/replay_video.py data/recordings/p01.mp4 --targets data/recordings/p01_targets.csv --mirror
-```
-
----
-
-## Original documentation (v1)
+## Description
 
 A robust, high-performance desktop application that tracks eye gaze in real time via an integrated or external webcam and detects continuous dwell time on screen targets. Designed as an accessibility foundation for eye-gaze typing keyboards and assistive communication devices for individuals with severe motor impairments.
 
@@ -293,8 +158,8 @@ python main.py --headless
 
 ## 6. How Calibration Works
 
-1. Click **🎯 Calibrate (9-pt)** in the top bar.
-2. A fullscreen window will display 9 sequential targets (Top-Left $\rightarrow$ Bottom-Right).
+1. Click **🎯 Calibrate (16-pt)** in the top bar.
+2. A fullscreen window will display 16 sequential targets (Top-Left $\rightarrow$ Bottom-Right).
 3. Look steadily at the pulsing target. The progress circle will fill as valid samples are collected.
 4. The system rejects outlier samples using median distance filtering and fits your selected mapping model (Polynomial by default).
 5. Calibration profiles are automatically saved to `data/calibration_profile.json` and persist across sessions.
@@ -342,6 +207,8 @@ timestamp,gaze_x,gaze_y,horizontal_ratio,vertical_ratio,dwell_time,event,details
 
 ---
 
+## 9. Authors 
+Parth Verma, Nupur Talathi, Shroojan Dhok, Anushka Wankhede, Ayush Taske & Vedika Kulkarni
 ## 9. Running Automated Unit Tests
 
 To run the full unit test suite verifying fixation, dwell engine, blink pausing, and calibration models:
