@@ -1,0 +1,6 @@
+timestamp,gaze_x,gaze_y,horizontal_ratio,vertical_ratio,dwell_time,event,details
+13:28:09.410,0.0,0.0,0.000,0.000,0.00,session_start,Session session_20260928_132809 initiated
+13:28:29.430,0.0,768.0,None,None,1.53,dwell_triggered,Free-space dwell
+13:28:30.120,0.0,768.0,None,None,1.62,dwell_triggered,Free-space dwell
+13:28:30.807,0.0,768.0,None,None,1.71,dwell_triggered,Free-space dwell
+13:29:48.120,0.0,0.0,0.000,0.000,0.00,session_stop,Session finalized

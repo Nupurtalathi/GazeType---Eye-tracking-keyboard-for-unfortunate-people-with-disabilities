@@ -1,0 +1,13 @@
+{
+  "_comment": "Top-row quick phrases on the gaze keyboard. 2-10 entries. 'label' is shown on the key (keep it short), 'speak' is what is spoken aloud and typed.",
+  "phrases": [
+    {"label": "WATER",    "speak": "I need water"},
+    {"label": "FOOD",     "speak": "I am hungry"},
+    {"label": "WASHROOM", "speak": "I need to use the washroom"},
+    {"label": "HELP",     "speak": "Please help me"},
+    {"label": "PAIN",     "speak": "I am in pain"},
+    {"label": "MEDICINE", "speak": "I need my medicine"},
+    {"label": "YES",      "speak": "Yes"},
+    {"label": "NO",       "speak": "No"}
+  ]
+}
